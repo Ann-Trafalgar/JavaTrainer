@@ -611,10 +611,8 @@ class HumanPlayer extends Player {
             const code = correctCode[currentPart];
             codeHint.textContent = code;
             
-            // --- NEW: THE SCROLL FIX ---
-            // Count the lines in the hint
+            // --- THE SCROLL FIX ---
             const lineCount = code.split('\n').length;
-            // Pad the user input with blank lines to match the hint's scroll height
             userInput.value = '\n'.repeat(lineCount);
             // --- END FIX ---
             
@@ -629,14 +627,12 @@ class HumanPlayer extends Player {
             typingArea.style.display = 'block';
             submitBtn.style.display = 'block';
             
-            // Reset scroll positions
             userInput.scrollTop = 0;
             userInput.scrollLeft = 0;
             codeHint.scrollTop = 0;
             codeHint.scrollLeft = 0;
             
             userInput.focus();
-            // Move cursor to the top, not the end of the blank lines
             userInput.setSelectionRange(0, 0);
         }
 
@@ -660,7 +656,6 @@ class HumanPlayer extends Player {
         }
 
         function checkCode() {
-            // Trim the user's code to remove the blank line padding
             const userCode = userInput.value.trim();
             const answerCode = correctCode[currentPart];
             
@@ -677,7 +672,6 @@ class HumanPlayer extends Player {
                 resultsArea.className = 'error';
                 resultsArea.style.display = 'block';
                 
-                // Pass the trimmed code to the diff generator
                 generateDiffView(userCode, answerCode);
                 diffContainer.style.display = 'flex';
             }
@@ -714,12 +708,32 @@ class HumanPlayer extends Player {
         
         // --- 4. Event Listeners ---
         
-        // **NEW: ROBUST TWO-WAY SCROLL SYNC**
+        // **NEW: Handle Tab Key for Indentation**
+        userInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault(); // Stop the browser from tabbing away
+
+                // Get cursor position
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                const spaces = "    ";
+
+                // Insert 4 spaces
+                this.value = this.value.substring(0, start) +
+                             spaces +
+                             this.value.substring(end);
+
+                // Move cursor to after the inserted spaces
+                this.selectionStart = this.selectionEnd = start + spaces.length;
+            }
+        });
+
+        // **ROBUST TWO-WAY SCROLL SYNC**
         
         let lastScrollSource = null;
 
         function syncScroll(source, target) {
-            // Because the scroll heights are now identical,
+            // Because the scroll heights are now identical (due to line padding),
             // we can just set the scrollTop and scrollLeft directly.
             target.scrollTop = source.scrollTop;
             target.scrollLeft = source.scrollLeft;
@@ -728,18 +742,18 @@ class HumanPlayer extends Player {
         userInput.addEventListener('scroll', () => {
             if (lastScrollSource === 'hint') {
                 lastScrollSource = null; // Reset
-                return; // This scroll was caused by the hint, so do nothing
+                return;
             }
-            lastScrollSource = 'user'; // I am the master
+            lastScrollSource = 'user';
             syncScroll(userInput, codeHint);
         });
         
         codeHint.addEventListener('scroll', () => {
             if (lastScrollSource === 'user') {
                 lastScrollSource = null; // Reset
-                return; // This scroll was caused by the user, so do nothing
+                return;
             }
-            lastScrollSource = 'hint'; // I am the master
+            lastScrollSource = 'hint';
             syncScroll(codeHint, userInput);
         });
 
