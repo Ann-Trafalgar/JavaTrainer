@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>wadwadasdwas</title>
+    <title>Java Code Trainer</title>
     <style>
         /* --- 1. Modern & Simplistic "Soft Dark" Design --- */
         :root {
             --bg-color: #121212;
             --container-color: #1e1e1e;
-            --primary-color: #3ea6ff; /* Soft, modern blue */
-            --accent-color: #69f0ae; /* Soft green */
-            --error-color: #ff5252; /* Soft red */
+            --primary-color: #3ea6ff;
+            --accent-color: #69f0ae; /* Green for "correct" */
+            --error-color: #ff5252;
+            --error-bg: #4d1a1a;
             --text-color: #e0e0e0;
             --text-muted: #757575;
             --border-color: #333333;
@@ -78,7 +79,7 @@
 
         button.primary-btn {
             background-color: var(--primary-color);
-            color: #000; /* Black text for high contrast on blue */
+            color: #000;
             border-color: var(--primary-color);
             font-weight: 600;
         }
@@ -131,18 +132,17 @@
 
         /* --- 3. Workspace (Typing Area) --- */
         #workspace {
-            display: none; /* Hidden by default */
+            display: none;
         }
 
         .typing-area-container {
             position: relative;
             width: 100%;
-            height: 500px; /* Fixed height */
+            height: 500px;
             margin: 20px 0;
-            display: none; /* Hidden until mode is selected */
+            display: none;
         }
 
-        /* Shared styles for sync */
         #code-hint, #user-code-input {
             position: absolute;
             top: 0;
@@ -157,25 +157,21 @@
             font-family: var(--font-code);
             font-size: 14px;
             line-height: 1.5;
-            white-space: pre; /* No text wrapping */
+            white-space: pre;
+            overflow: auto; /* Both scroll */
         }
 
-        /* The background "hint" text */
         #code-hint {
-            color: #555; /* Darker muted text */
+            color: #555;
             background-color: var(--container-color);
             z-index: 1;
-            overflow: hidden; /* **FIX**: This element NEVER scrolls */
         }
 
-        /* The user's typing area */
         #user-code-input {
             color: var(--text-color);
-            background: transparent; /* See-through! */
-            z-index: 2; /* Sits on top */
-            resize: none; 
-            overflow: auto; /* **FIX**: This is the ONLY element that scrolls */
-            
+            background: transparent;
+            z-index: 2;
+            resize: none;
             spellcheck: false;
             autocorrect: off;
             autocapitalize: off;
@@ -192,20 +188,20 @@
             margin-top: 20px;
             padding: 20px;
             border-radius: 8px;
-            display: none; /* Hidden by default */
+            display: none;
             text-align: center;
             font-size: 1.3em;
             font-weight: 600;
         }
 
         #results-area.success {
-            background-color: #1e4620; /* Dark green */
+            background-color: #1e4620;
             color: var(--accent-color);
             border: 1px solid var(--accent-color);
         }
 
         #results-area.error {
-            background-color: #4d1a1a; /* Dark red */
+            background-color: var(--error-bg);
             color: var(--error-color);
             border: 1px solid var(--error-color);
         }
@@ -232,16 +228,37 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 5px;
             font-weight: 500;
+        }
+        
+        /* --- NEW: Colored Headers --- */
+        .diff-box h3.user-header {
             color: var(--primary-color);
         }
         
-        .diff-box pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .diff-box h3.correct-header {
+            color: var(--accent-color);
+        }
+        
+        .diff-content {
             font-family: var(--font-code);
             font-size: 12px;
-            color: var(--text-muted);
             line-height: 1.5;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        /* --- NEW: Error only highlights the line with the class --- */
+        .diff-content .diff-error {
+            background-color: var(--error-bg);
+            color: var(--error-color);
+            display: block;
+            min-height: 1.5em;
+        }
+        
+        .diff-content .diff-correct {
+            display: block;
+            min-height: 1.5em;
         }
 
     </style>
@@ -249,7 +266,7 @@
 <body>
 
     <div class="app-container">
-        <h1>WASD</h1>
+        <h1>Java Code Trainer</h1>
 
         <div id="part-selection">
             <button onclick="showWorkspace(1)">Part 1: Players</button>
@@ -277,12 +294,12 @@
             <div id="results-area"></div>
             <div id="diff-container">
                 <div class="diff-box">
-                    <h3>Your Code</h3>
-                    <pre id="diff-user"></pre>
+                    <h3 class="user-header">Your Code (Line by Line)</h3>
+                    <div id="diff-user" class="diff-content"></div>
                 </div>
                 <div class="diff-box">
-                    <h3>Correct Code</h3>
-                    <pre id="diff-correct"></pre>
+                    <h3 class="correct-header">Correct Code (Line by Line)</h3>
+                    <div id="diff-correct" class="diff-content"></div>
                 </div>
             </div>
         </div>
@@ -569,19 +586,12 @@ class HumanPlayer extends Player {
         function setMode(mode) {
             const code = correctCode[currentPart];
             codeHint.textContent = code;
-            
-            // --- SCROLLBAR FIX ---
-            // We pre-fill the textarea with newlines matching the hint's height.
-            // This makes the scrollbar active from the start.
-            // We add a few extra to be safe.
-            const lineCount = code.split('\n').length;
-            userInput.value = '\n'.repeat(lineCount + 5);
-            // --- END FIX ---
+            userInput.value = '';
             
             if (mode === 'try') {
-                codeHint.style.opacity = '0.4'; // Muted, but visible
+                codeHint.style.opacity = '0.4';
             } else {
-                codeHint.style.opacity = '0'; // Invisible
+                codeHint.style.opacity = '0';
             }
             
             resultsArea.style.display = 'none';
@@ -589,25 +599,35 @@ class HumanPlayer extends Player {
             typingArea.style.display = 'block';
             submitBtn.style.display = 'block';
             
-            // Go to the top and focus the textarea
             userInput.scrollTop = 0;
             userInput.focus();
-            userInput.setSelectionRange(0, 0); // Move cursor to line 1
         }
 
-        function normalizeCode(str) {
-            // Removes all whitespace (spaces, tabs, newlines)
-            return str.replace(/\s/g, '');
+        function smartNormalize(str) {
+            return str.split('\n')
+                .map(s => s.trim())
+                .filter(Boolean)
+                .join('\n');
+        }
+        
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
         }
 
         function checkCode() {
-            // **FIX**: .trim() removes the dummy newlines from the end
-            // before we normalize.
-            const userCode = userInput.value.trim();
+            const userCode = userInput.value;
             const answerCode = correctCode[currentPart];
             
-            const normalizedUser = normalizeCode(userCode);
-            const normalizedAnswer = normalizeCode(answerCode);
+            const normalizedUser = smartNormalize(userCode);
+            const normalizedAnswer = smartNormalize(answerCode);
             
             if (normalizedUser === normalizedAnswer) {
                 resultsArea.textContent = '🎉 Correct! Well done! 🎉';
@@ -619,21 +639,56 @@ class HumanPlayer extends Player {
                 resultsArea.className = 'error';
                 resultsArea.style.display = 'block';
                 
-                // Show the "diff"
-                diffUser.textContent = userCode; // Show their trimmed, typed code
-                diffCorrect.textContent = answerCode;
+                generateDiffView(userCode, answerCode);
                 diffContainer.style.display = 'flex';
             }
+        }
+        
+        /**
+         * Generates the HTML for the side-by-side diff view.
+         */
+        function generateDiffView(userCode, answerCode) {
+            const userLines = userCode.split('\n');
+            const answerLines = answerCode.split('\n');
+            
+            const maxLines = Math.max(userLines.length, answerLines.length);
+            
+            let userHtml = '';
+            let answerHtml = '';
+            
+            for (let i = 0; i < maxLines; i++) {
+                const uLine = userLines[i] || '';
+                const aLine = answerLines[i] || '';
+                
+                const isMatch = (uLine.trim() === aLine.trim());
+                
+                // --- NEW LOGIC ---
+                // Only the user's line gets the "error" class
+                const userLineClass = isMatch ? 'diff-correct' : 'diff-error';
+                const answerLineClass = 'diff-correct'; // Answer is always correct
+                
+                const uLineDisplay = uLine === '' ? '&nbsp;' : escapeHTML(uLine);
+                const aLineDisplay = aLine === '' ? '&nbsp;' : escapeHTML(aLine);
+                
+                userHtml += `<span class="${userLineClass}">${uLineDisplay}</span>`;
+                answerHtml += `<span class="${answerLineClass}">${aLineDisplay}</span>`;
+            }
+            
+            diffUser.innerHTML = userHtml;
+            diffCorrect.innerHTML = answerHtml;
         }
         
         // --- 4. Event Listeners ---
         
         // **SCROLLBAR SYNC**
-        // When the user scrolls their textarea, we scroll the hidden hint
-        // text to match.
         userInput.addEventListener('scroll', () => {
             codeHint.scrollTop = userInput.scrollTop;
             codeHint.scrollLeft = userInput.scrollLeft;
+        });
+        
+        codeHint.addEventListener('scroll', () => {
+            userInput.scrollTop = codeHint.scrollTop;
+            userInput.scrollLeft = codeHint.scrollLeft;
         });
 
     </script>
